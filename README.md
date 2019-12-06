@@ -11,13 +11,12 @@ Upon input of this search criteria, the first 20 files were selected for each ge
 
 
 ## Abstract: 
-RNA sequencing data can be used to analyse the differential expression of genes for a particular disease amongst two subsets of patients. In this analysis, the counts data for each gene is used as the input. To this data, pre-processing, exploratory data analysis and differential expression analysis is done. The input data is derived from The Cancer Genome Atlas Program Database in the htseq-counts format. Various packages are used for the computation. EdgeR is used to store the data in a retrievable and organized format. Limma is used to conduct linear modelling and the Glimma package is used to create interactive graph's that allow the end user to explore the data. Additionally, packages such as gplots and heatmap.plus are used to create some useful diagramatic representation of the data. 
+RNA sequencing data can be used to analyze the differential expression of genes for a particular disease amongst two subsets of patients. In this analysis, the counts data for each gene is used as the input. To this data, pre-processing, exploratory data analysis and differential expression analysis is done. The input data is derived from The Cancer Genome Atlas Program Database in the htseq-counts format. Various packages are used for the computation. EdgeR is used to store the data in a retrievable and organized format. Limma is used to conduct linear modelling and the Glimma package is used to create interactive graph's that allow the end user to explore the data. Additionally, packages such as gplots and heatmap.plus are used to create some useful diagrammatic representation of the data. 
 
 ## Let's Begin!
 ## Setting Up: 
 
 The libraries required for analysis are loaded in. Glimma and Limma are used for computation and analysis of differential expression. EdgeR is used to organize the data into a dataframe. Homo.sapiens is a key created by Bioconductor that allows the information of GeneID to be compared to other methods of naming. 
-
 ```{r}
 library(Glimma)
 library(edgeR)
@@ -25,7 +24,7 @@ library(limma)
 library(Homo.sapiens)
 library(reticulate)
 ```
-## Loading in the Data
+# Loading in the Data
 
 The working directory is set to the location where the files are stored.
 ```{r}
@@ -67,7 +66,7 @@ geneid <-gsub("\\.[0-9]*$","", geneid)
 head(geneid)
 
 ```
-The dataframe genes is used to store the gene-level information corresponding to the rows of genes in our datasets. The information required for this data frame is retreived from the 'Homo.sapiens' library. The GeneIDs are associated with the symbol and the chromosome number of each gene. 
+The dataframe genes is used to store the gene-level information corresponding to the rows of genes in our datasets. The information required for this data frame is retrieved from the 'Homo.sapiens' library. The GeneIDs are associated with the symbol and the chromosome number of each gene. 
 ```{r}
 genes <- select(Homo.sapiens, keys=geneid, columns=c("SYMBOL", "TXCHROM"), 
                 keytype="ENSEMBL")
@@ -86,7 +85,7 @@ The data is transformed from its raw form to more useable. The calculations of "
 cpm <- cpm(x)
 lcpm <- cpm(x, log=TRUE)
 ```
-For further calculations the data is processed using the calculations below.
+For further calculations the data is processed using the calculations below. L is the average library size in millions. M is the median of the library size in millions. 
 ```{r}
 L <- mean(x$samples$lib.size) * 1e-6
 M <- median(x$samples$lib.size) * 1e-6
@@ -96,7 +95,7 @@ The summary of the lcpm calculation is presented graphically.
 ```{r}
 summary(lcpm)
 ```
-Some genes are lowly expressed and do not contribute to the statistical analysis in a meaningful manner. To understand the ratio of these genes the following line is run: 
+Some genes are lowly expressed and do not contribute to the statistical analysis in a meaningful manner. These are genes that are lowly expressed in both of the data groups. To understand the ratio of these genes the following line is run: 
 ```{r}
 table(rowSums(x$counts==0)==9)
 ```
@@ -106,6 +105,7 @@ keep.exprs <- filterByExpr(x, group=group)
 x <- x[keep.exprs,, keep.lib.sizes=FALSE]
 dim(x)
 ```
+As you can see, the number of genes used for interpretation are reduced from the 60,000 range to the 20,000 range. 
 The filtered versus unfiltered data is presented in a graphical manner using the following lines of code. The package "RColorBrewer" allows for the creation of visually appealing graphs. 
 ```{r}
 lcpm.cutoff <- log2(10/M + 2/L)
@@ -152,7 +152,7 @@ title(main="A. Example: Unnormalised data",ylab="Log-cpm")
 x2 <- calcNormFactors(x2)  
 x2$samples$norm.factors
 ```
-
+Please refer to the the log-cpm plots of the datasets M1 and M4 to visualize the effects of normalization of the data. 
 ```{r}
 lcpm <- cpm(x2, log=TRUE)
 boxplot(lcpm, las=2, col=col, main="")
@@ -178,7 +178,7 @@ glMDSPlot(lcpm,groups = group)
 
 ## Differential Expression Analysis
 
-We are now beginning the Differential expression analysis. The first step is to greate a design matrix with both the groups of data. 
+We are now beginning the Differential expression analysis. The first step is to create a design matrix with both the groups of data. 
 ```{r}
 design <- model.matrix(~0+group)
 colnames(design) <- gsub("group", "", colnames(design))
@@ -191,7 +191,7 @@ contr.matrix <- makeContrasts(
    levels = colnames(design))
 contr.matrix
 ```
-Voom is a function within limma that allows the raw counts data to be transformed into the normalized data that accomadates the mean-variance relationship.
+Voom is a function within limma that allows the raw counts data to be transformed into the normalized data that accommadates the mean-variance relationship.
 ```{r}
 par(mfrow=c(1,2))
 v <- voom(x, design, plot=TRUE)
@@ -203,11 +203,12 @@ vfit <- contrasts.fit(vfit, contrasts=contr.matrix)
 efit <- eBayes(vfit)
 plotSA(efit, main="Final model: Mean-variance trend")
 ```
+In these two plots, the relationship between the mean and variances of the data are plot. The first graph represents the relationship before the data is normalized using voom and second, after. The effect of normalization can be visualized through the lines of best fit. 
 To have a sneak peak at the differential expression levels, the following table can be created. (Up- up-regulated genes)
 ```{r}
 summary(decideTests(efit))
 ```
-T-statistics allows for a more stringent definition of signigicance to be applied to the data. 
+T-statistics allows for a more stringent definition of significance to be applied to the data. 
 ```{r}
 tfit <- treat(vfit, lfc=1)
 dt <- decideTests(tfit)
@@ -226,7 +227,7 @@ vennDiagram(dt[,1], circle.col=c("turquoise", "salmon"))
 ```{r}
 write.fit(tfit, dt, file="results.txt")
 ```
-
+The genes that are most differentially expressed are listed using a function known as 'toptreat'. 
 ```{r}
 
 Male.vs.Female <- topTreat(tfit, coef=1, n=Inf)
@@ -238,6 +239,7 @@ To summarise the genes, the log fold change is plot against the log counts per m
 plotMD(tfit, column=1, status=dt[,1], main=colnames(tfit)[1], 
        xlim=c(-8,13))
 ```
+This plot shows a small subset of up-regulated genes. These genes seem to be found on the Y chromosome. This acts as a test to analyze the difference in regulations of the gene between genders.
 
 Glimma allows the same information to be presented interactively. 
 ```{r}
@@ -256,3 +258,11 @@ par(cex.main=0.8,mar=c(1,1,1,1))
 heatmap.plus(lcpm[i,], col=bluered(20),cexRow=1,cexCol=0.2, margins = c(20,13), main="HeatMap")
 
 ```
+Samples with a high expression are represented in red, low expression are expressed in blue, and intermediate expression are represented by white. A dendogram is shown for the sample clustering. 
+
+## Conclusion:
+This analysis allowed for a group of datasets to be interpretted and understood better. The key aspects include converting the data from its raw state to a more useable format, the application of various functions to group and organize the data and finally the conduction of analytic functions such as plotting a heatmap and an MDS plot to understand the data. 
+
+## Link to the Webpage
+
+The link to the webpage published via RPubs can be found here: http://rpubs.com/RamiyaSiva/556278
